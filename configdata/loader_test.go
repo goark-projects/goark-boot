@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/goark-projects/boot/configdata"
+	"goark.dev/boot/configdata"
 )
 
 func TestLoad_whenDefaultAndProfileFilesExist_shouldApplySpringLikePriority(t *testing.T) {
@@ -123,7 +123,7 @@ name = "toml"
 	}
 }
 
-func TestLoad_whenNoConfigFilesExist_shouldReturnEmptyEnvironment(t *testing.T) {
+func TestLoad_whenNoConfigFilesExist_shouldReturnNoLoadedSources(t *testing.T) {
 	result, err := configdata.Load(context.Background(), configdata.WithLocations(t.TempDir()))
 	if err != nil {
 		t.Fatalf("load config failed: %v", err)
@@ -131,14 +131,11 @@ func TestLoad_whenNoConfigFilesExist_shouldReturnEmptyEnvironment(t *testing.T) 
 	if len(result.Sources) != 0 {
 		t.Fatalf("expected no sources, got %#v", result.Sources)
 	}
-	if len(result.Environment.Keys()) != 0 {
-		t.Fatalf("expected empty environment, got %#v", result.Environment.Snapshot())
-	}
 }
 
 func mustGet(t *testing.T, result *configdata.Result, key string) string {
 	t.Helper()
-	value, ok := result.Environment.Get(key)
+	value, ok := result.Environment.GetProperty(key)
 	if !ok {
 		t.Fatalf("expected key %q", key)
 	}

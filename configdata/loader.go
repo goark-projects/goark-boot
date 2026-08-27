@@ -3,8 +3,8 @@ package configdata
 import (
 	"context"
 
-	coreconfig "github.com/goark-projects/goark/config"
-	arkerrors "github.com/goark-projects/goark/errors"
+	coreenv "goark.dev/goark/core/env"
+	arkerrors "goark.dev/goark/errors"
 )
 
 // Loader 按 Boot 约定加载配置文件。
@@ -15,7 +15,7 @@ type Loader struct {
 
 // Result 表示配置加载结果。
 type Result struct {
-	Environment *coreconfig.Environment
+	Environment *coreenv.StandardEnvironment
 	Sources     []LoadedSource
 	Profiles    []string
 }
@@ -56,7 +56,7 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 		return nil, arkerrors.Wrap(arkerrors.CodeLifecycle, err, "config loading canceled")
 	}
 
-	env, err := coreconfig.NewEnvironment()
+	env, err := coreenv.NewEnvironment()
 	if err != nil {
 		return nil, err
 	}
@@ -82,17 +82,17 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 	}, nil
 }
 
-func (l *Loader) loadBaseSources(ctx context.Context, env *coreconfig.Environment) ([]LoadedSource, error) {
+func (l *Loader) loadBaseSources(ctx context.Context, env *coreenv.StandardEnvironment) ([]LoadedSource, error) {
 	candidates := discoverBaseFiles(l.options)
 	return l.loadCandidates(ctx, env, candidates)
 }
 
-func (l *Loader) loadProfileSources(ctx context.Context, env *coreconfig.Environment, profiles []string) ([]LoadedSource, error) {
+func (l *Loader) loadProfileSources(ctx context.Context, env *coreenv.StandardEnvironment, profiles []string) ([]LoadedSource, error) {
 	candidates := discoverProfileFiles(l.options, profiles)
 	return l.loadCandidates(ctx, env, candidates)
 }
 
-func (l *Loader) loadCandidates(ctx context.Context, env *coreconfig.Environment, candidates []Candidate) ([]LoadedSource, error) {
+func (l *Loader) loadCandidates(ctx context.Context, env *coreenv.StandardEnvironment, candidates []Candidate) ([]LoadedSource, error) {
 	loaded := make([]LoadedSource, 0, len(candidates))
 	for _, candidate := range candidates {
 		if err := ctx.Err(); err != nil {
@@ -102,11 +102,11 @@ func (l *Loader) loadCandidates(ctx context.Context, env *coreconfig.Environment
 		if err != nil {
 			return nil, err
 		}
-		source, err := coreconfig.NewMapSource(candidate.SourceName(), values)
+		source, err := coreenv.NewConfigPropertySource(candidate.SourceName(), propertyMap(values))
 		if err != nil {
 			return nil, err
 		}
-		if err := env.AddFirst(source); err != nil {
+		if err := env.PropertySources().AddFirst(source); err != nil {
 			return nil, err
 		}
 		loaded = append(loaded, candidate.LoadedSource())
@@ -114,16 +114,24 @@ func (l *Loader) loadCandidates(ctx context.Context, env *coreconfig.Environment
 	return loaded, nil
 }
 
-func (l *Loader) resolveProfiles(env *coreconfig.Environment) ([]string, error) {
+func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, error) {
 	if l.options.ProfilesExplicit {
 		return append([]string(nil), l.options.Profiles...), nil
 	}
 	values := make([]string, 0, 1)
 	for _, key := range []string{profileKeyGoark, profileKeySpring, profileKeyShort} {
-		if value, ok := env.Get(key); ok {
+		if value, ok := env.GetProperty(key); ok {
 			values = append(values, value)
 			break
 		}
 	}
 	return normalizeProfiles(values)
+}
+
+func propertyMap(values map[string]string) map[string]any {
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }

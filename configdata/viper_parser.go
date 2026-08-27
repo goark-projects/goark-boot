@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/go-viper/encoding/javaproperties"
-	arkerrors "github.com/goark-projects/goark/errors"
 	"github.com/spf13/viper"
+	arkerrors "goark.dev/goark/errors"
 )
 
 // ViperParser 使用 Viper 解析 YAML、TOML 和 Java properties。

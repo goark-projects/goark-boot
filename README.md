@@ -2,7 +2,7 @@
 
 ![goark](assets/goark-readme-logo.png)
 
-`goark boot` is the bootstrap and convention layer for the Goark ecosystem. It provides application startup, lifecycle wiring, configuration loading, and framework module assembly on top of the core [`goark`](https://github.com/goark-projects/goark) contracts.
+`goark boot` is the bootstrap and convention layer for the Goark ecosystem. It provides application startup, lifecycle wiring, configuration loading, and framework module assembly on top of the core [`goark`](https://goark.dev/goark) contracts.
 
 The first boot feature is Spring Boot style config data loading for `app.yml`, `app.toml`, and `app.properties`.
 
@@ -65,7 +65,7 @@ package main
 import (
 	"context"
 
-	"github.com/goark-projects/boot/configdata"
+	"goark.dev/boot/configdata"
 )
 
 func main() {
@@ -83,7 +83,7 @@ Config parsing uses [`spf13/viper`](https://github.com/spf13/viper) with the Jav
 ## Module
 
 ```bash
-go get github.com/goark-projects/boot
+go get goark.dev/boot
 ```
 
 ## Repository Status
@@ -118,9 +118,9 @@ go test ./...
 
 ## Related Repositories
 
-- [`goark-projects/goark`](https://github.com/goark-projects/goark): core framework contracts.
-- [`goark-projects/boot`](https://github.com/goark-projects/boot): application bootstrap and convention layer.
-- [`goark-projects/cli`](https://github.com/goark-projects/cli): scaffolding and compile-time code generation.
+- [`goark.dev/goark`](https://goark.dev/goark): core framework contracts.
+- [`goark.dev/boot`](https://goark.dev/boot): application bootstrap and convention layer.
+- [`goark.dev/cli`](https://goark.dev/cli): scaffolding and compile-time code generation.
 
 ## License
 

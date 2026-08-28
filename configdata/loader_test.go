@@ -123,13 +123,90 @@ name = "toml"
 	}
 }
 
-func TestLoad_whenNoConfigFilesExist_shouldReturnNoLoadedSources(t *testing.T) {
+func TestLoad_whenArgsSpecifyConfigFileAndProfile_shouldLoadExactFileAndProfileVariant(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "custom.yaml")
+	writeFile(t, base, `
+app:
+  name: base
+feature:
+  enabled: false
+`)
+	writeFile(t, filepath.Join(root, "custom-dev.yaml"), `
+app:
+  name: dev
+feature:
+  enabled: true
+`)
+
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithArgs(
+			"--goark.config.location", base,
+			"--spring.profiles.active=dev",
+		),
+	)
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+
+	if got := mustGet(t, result, "app.name"); got != "dev" {
+		t.Fatalf("expected profile config to win, got %q", got)
+	}
+	if got := mustGet(t, result, "feature.enabled"); got != "true" {
+		t.Fatalf("expected profile feature flag, got %q", got)
+	}
+	if !reflect.DeepEqual(result.Profiles, []string{"dev"}) {
+		t.Fatalf("profiles = %#v, want dev", result.Profiles)
+	}
+	if !reflect.DeepEqual(result.Environment.ActiveProfiles(), []string{"dev"}) {
+		t.Fatalf("environment profiles = %#v, want dev", result.Environment.ActiveProfiles())
+	}
+	if len(result.Sources) != 2 ||
+		result.Sources[0].Path != filepath.Clean(base) ||
+		result.Sources[1].Path != filepath.Clean(filepath.Join(root, "custom-dev.yaml")) {
+		t.Fatalf("unexpected sources: %#v", result.Sources)
+	}
+}
+
+func TestLoad_whenEnvironmentSpecifiesLocationNameAndProfile_shouldApplyEnvironment(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv(configdata.EnvConfigLocation, root)
+	t.Setenv(configdata.EnvConfigName, "service")
+	t.Setenv(configdata.EnvProfilesActive, "prod")
+	writeFile(t, filepath.Join(root, "service.properties"), `
+app.name=base
+`)
+	writeFile(t, filepath.Join(root, "service-prod.properties"), `
+app.name=prod
+`)
+
+	result, err := configdata.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+
+	if got := mustGet(t, result, "app.name"); got != "prod" {
+		t.Fatalf("expected env profile config to win, got %q", got)
+	}
+	if !reflect.DeepEqual(result.Profiles, []string{"prod"}) {
+		t.Fatalf("profiles = %#v, want prod", result.Profiles)
+	}
+	if len(result.Sources) != 2 {
+		t.Fatalf("sources = %#v, want base and profile", result.Sources)
+	}
+}
+
+func TestLoad_whenNoConfigFilesExist_shouldReturnBuiltInDefaults(t *testing.T) {
 	result, err := configdata.Load(context.Background(), configdata.WithLocations(t.TempDir()))
 	if err != nil {
 		t.Fatalf("load config failed: %v", err)
 	}
-	if len(result.Sources) != 0 {
-		t.Fatalf("expected no sources, got %#v", result.Sources)
+	if len(result.Sources) != 1 || !result.Sources[0].BuiltIn {
+		t.Fatalf("expected built-in source, got %#v", result.Sources)
+	}
+	if got := mustGet(t, result, "goark.application.name"); got != "goark" {
+		t.Fatalf("built-in application name = %q", got)
 	}
 }
 

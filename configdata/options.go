@@ -10,10 +10,29 @@ import (
 
 const (
 	defaultBaseName = "app"
+	defaultResource = "resource"
 
 	profileKeyGoark  = "goark.profiles.active"
 	profileKeySpring = "spring.profiles.active"
 	profileKeyShort  = "profiles.active"
+)
+
+const (
+	// PropertyConfigLocation 设置配置文件或配置目录位置。
+	PropertyConfigLocation = "goark.config.location"
+	// PropertyConfigName 设置配置文件基础名称。
+	PropertyConfigName = "goark.config.name"
+	// PropertyProfilesActive 设置激活 Profile。
+	PropertyProfilesActive = profileKeyGoark
+)
+
+const (
+	// EnvConfigLocation 设置配置文件或配置目录位置。
+	EnvConfigLocation = "GOARK_CONFIG_LOCATION"
+	// EnvConfigName 设置配置文件基础名称。
+	EnvConfigName = "GOARK_CONFIG_NAME"
+	// EnvProfilesActive 设置激活 Profile。
+	EnvProfilesActive = "GOARK_PROFILES_ACTIVE"
 )
 
 // Format 表示配置文件格式。
@@ -21,6 +40,7 @@ type Format string
 
 const (
 	FormatYAML       Format = "yml"
+	FormatYAMLFull   Format = "yaml"
 	FormatTOML       Format = "toml"
 	FormatProperties Format = "properties"
 )
@@ -77,6 +97,14 @@ func WithLocations(locations ...string) Option {
 	}
 }
 
+// WithArgs 应用命令行配置参数，支持 --goark.config.location 和 Spring 兼容键。
+func WithArgs(args ...string) Option {
+	copied := append([]string(nil), args...)
+	return func(options *Options) error {
+		return applyCommandLine(options, copied)
+	}
+}
+
 // WithFormats 设置同名配置文件的格式优先级。
 func WithFormats(formats ...Format) Option {
 	return func(options *Options) error {
@@ -97,7 +125,13 @@ func newOptions(options ...Option) (Options, error) {
 	config := Options{
 		BaseName:  defaultBaseName,
 		Locations: defaultLocations,
-		Formats:   []Format{FormatYAML, FormatTOML, FormatProperties},
+		Formats:   []Format{FormatYAML, FormatYAMLFull, FormatTOML, FormatProperties},
+	}
+	if err := applyEnvironment(&config); err != nil {
+		return Options{}, err
+	}
+	if err := applyCommandLine(&config, os.Args[1:]); err != nil {
+		return Options{}, err
 	}
 	for _, option := range options {
 		if option == nil {
@@ -116,20 +150,36 @@ func defaultLocations() ([]string, error) {
 		return nil, arkerrors.Wrap(arkerrors.CodeInvalidArgument, err, "failed to resolve executable path")
 	}
 	executableDir := filepath.Dir(executable)
-	return normalizeLocations([]string{filepath.Join(executableDir, "conf"), executableDir})
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, arkerrors.Wrap(arkerrors.CodeInvalidArgument, err, "failed to resolve working directory")
+	}
+	return defaultLocationsFor(executableDir, workingDir)
+}
+
+func defaultLocationsFor(executableDir string, workingDir string) ([]string, error) {
+	locations := []string{
+		filepath.Join(executableDir, defaultResource),
+	}
+	if strings.TrimSpace(workingDir) != "" {
+		locations = append(locations, filepath.Join(workingDir, defaultResource))
+	}
+	return normalizeLocations(locations)
 }
 
 func normalizeLocations(locations []string) ([]string, error) {
 	if len(locations) == 0 {
 		return nil, arkerrors.New(arkerrors.CodeInvalidArgument, "config locations are empty")
 	}
-	seen := make(map[string]struct{}, len(locations))
+	rawLocations := splitLocations(locations)
+	seen := make(map[string]struct{}, len(rawLocations))
 	normalized := make([]string, 0, len(locations))
-	for _, location := range locations {
+	for _, location := range rawLocations {
 		location = strings.TrimSpace(location)
 		if location == "" {
 			return nil, arkerrors.New(arkerrors.CodeInvalidArgument, "config location is empty")
 		}
+		location = strings.TrimPrefix(location, "file:")
 		absolute, err := filepath.Abs(location)
 		if err != nil {
 			return nil, arkerrors.Wrapf(arkerrors.CodeInvalidArgument, err, "failed to resolve config location %q", location)
@@ -145,6 +195,18 @@ func normalizeLocations(locations []string) ([]string, error) {
 		return nil, arkerrors.New(arkerrors.CodeInvalidArgument, "config locations are empty")
 	}
 	return normalized, nil
+}
+
+func splitLocations(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		for _, item := range strings.Split(value, ",") {
+			if item = strings.TrimSpace(item); item != "" {
+				out = append(out, item)
+			}
+		}
+	}
+	return out
 }
 
 func normalizeProfiles(profiles []string) ([]string, error) {
@@ -185,7 +247,7 @@ func normalizeFormats(formats []Format) ([]Format, error) {
 	for _, format := range formats {
 		format = Format(strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(format)), ".")))
 		switch format {
-		case FormatYAML, FormatTOML, FormatProperties:
+		case FormatYAML, FormatYAMLFull, FormatTOML, FormatProperties:
 		default:
 			return nil, arkerrors.Newf(arkerrors.CodeInvalidArgument, "unsupported config format %q", format)
 		}

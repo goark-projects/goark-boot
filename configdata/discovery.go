@@ -3,6 +3,7 @@ package configdata
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Candidate 表示一个待加载配置文件。
@@ -20,6 +21,7 @@ type LoadedSource struct {
 	Format   Format
 	Profile  string
 	Location string
+	BuiltIn  bool
 }
 
 func discoverBaseFiles(options Options) []Candidate {
@@ -46,6 +48,22 @@ func discoverProfileFiles(options Options, profiles []string) []Candidate {
 }
 
 func firstExistingCandidate(name string, profile string, location string, formats []Format) (Candidate, bool) {
+	if format, ok := explicitFileFormat(location, formats); ok {
+		path := location
+		if profile != "" {
+			path = profileFilePath(location, profile)
+		}
+		info, err := os.Stat(path)
+		if err == nil && !info.IsDir() {
+			return Candidate{
+				Path:     filepath.Clean(path),
+				Format:   format,
+				Profile:  profile,
+				Location: filepath.Clean(filepath.Dir(path)),
+			}, true
+		}
+		return Candidate{}, false
+	}
 	for _, format := range formats {
 		path := filepath.Join(location, name+"."+string(format))
 		info, err := os.Stat(path)
@@ -59,6 +77,24 @@ func firstExistingCandidate(name string, profile string, location string, format
 		}
 	}
 	return Candidate{}, false
+}
+
+func explicitFileFormat(location string, formats []Format) (Format, bool) {
+	extension := strings.ToLower(strings.TrimPrefix(filepath.Ext(location), "."))
+	if extension == "" {
+		return "", false
+	}
+	for _, format := range formats {
+		if string(format) == extension {
+			return format, true
+		}
+	}
+	return "", false
+}
+
+func profileFilePath(path string, profile string) string {
+	extension := filepath.Ext(path)
+	return strings.TrimSuffix(path, extension) + "-" + profile + extension
 }
 
 func (c Candidate) SourceName() string {

@@ -68,6 +68,9 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := applyActiveProfiles(env, profiles); err != nil {
+		return nil, err
+	}
 	profileSources, err := l.loadProfileSources(ctx, env, profiles)
 	if err != nil {
 		return nil, err
@@ -75,6 +78,16 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 
 	sources := append([]LoadedSource(nil), baseSources...)
 	sources = append(sources, profileSources...)
+	if len(sources) == 0 {
+		source, err := builtInDefaultPropertySource()
+		if err != nil {
+			return nil, err
+		}
+		if err := env.PropertySources().AddLast(source); err != nil {
+			return nil, err
+		}
+		sources = append(sources, builtInLoadedSource())
+	}
 	return &Result{
 		Environment: env,
 		Sources:     sources,
@@ -126,6 +139,15 @@ func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, er
 		}
 	}
 	return normalizeProfiles(values)
+}
+
+func applyActiveProfiles(env *coreenv.StandardEnvironment, profiles []string) error {
+	for _, profile := range profiles {
+		if err := env.AddActiveProfile(profile); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func propertyMap(values map[string]string) map[string]any {

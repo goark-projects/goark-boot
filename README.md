@@ -4,7 +4,8 @@
 
 `goark boot` is the bootstrap and convention layer for the Goark ecosystem. It provides application startup, lifecycle wiring, configuration loading, and framework module assembly on top of the core [`goark`](https://goark.dev/goark) contracts.
 
-The first boot feature is Spring Boot style config data loading for `app.yml`, `app.toml`, and `app.properties`.
+The first boot feature is Spring Boot style config data loading for `app.yml`,
+`app.yaml`, `app.toml`, and `app.properties`.
 
 ## Goals
 
@@ -21,34 +22,71 @@ Config file loading belongs to `boot`, not the `goark` core module. The core mod
 Supported formats:
 
 - `yml`
+- `yaml`
 - `toml`
 - `properties`
 
 Default base files:
 
 - `app.yml`
+- `app.yaml`
 - `app.toml`
 - `app.properties`
 
 Default profile files:
 
 - `app-dev.yml`, `app-prod.yml`, `app-xxx.yml`
+- `app-dev.yaml`, `app-prod.yaml`, `app-xxx.yaml`
 - `app-dev.toml`, `app-prod.toml`, `app-xxx.toml`
 - `app-dev.properties`, `app-prod.properties`, `app-xxx.properties`
 
-Default locations are resolved relative to the executable directory:
+`resource` is the default Goark application resource entrypoint. Without an
+explicit location, boot looks for config files in:
 
 ```text
-<executable-dir>/conf
-<executable-dir>
+<executable-dir>/resource
+<working-dir>/resource
 ```
+
+The working directory resource root has higher priority. If no external config
+file is found, boot installs a built-in default config source.
+
+Startup can override the config location, config base name, and active profiles:
+
+```bash
+go run ./cmd/admin --goark.config.location=resource/app.yml --goark.profiles.active=dev
+go run ./cmd/admin --spring.config.location=resource --spring.profiles.active=prod
+```
+
+Environment variables use the same model:
+
+```bash
+GOARK_CONFIG_LOCATION=resource
+GOARK_CONFIG_NAME=app
+GOARK_PROFILES_ACTIVE=dev
+```
+
+Spring-compatible environment variables are also recognized:
+
+```bash
+SPRING_CONFIG_LOCATION=resource
+SPRING_CONFIG_NAME=app
+SPRING_PROFILES_ACTIVE=dev
+```
+
+`goark.config.location` and `spring.config.location` accept either directories or
+exact files such as `resource/app.yml`, `resource/app.yaml`, `resource/app.toml`,
+or `resource/app.properties`. When a profile is active and an exact file is
+provided, boot looks for a sibling profile file such as `app-dev.yml`.
 
 Priority rules:
 
 - Profile config overrides base config.
-- The executable directory overrides `conf`.
+- Explicit command-line args override environment variables and defaults.
+- Explicit Go options override process environment and command-line defaults.
+- The application `resource` directory is used when no location is specified.
 - Later active profiles override earlier active profiles.
-- For the same logical file, format priority is `yml > toml > properties`.
+- For the same logical file, format priority is `yml > yaml > toml > properties`.
 - Missing config files are allowed.
 
 Profiles can be provided explicitly with `configdata.WithProfiles("dev")`. If not provided, boot reads the first available profile key from base config:

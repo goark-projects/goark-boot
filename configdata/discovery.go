@@ -28,8 +28,16 @@ func discoverBaseFiles(options Options) []Candidate {
 	locations := append(append([]string(nil), options.Locations...), options.AdditionalLocations...)
 	candidates := make([]Candidate, 0, len(locations))
 	for _, location := range locations {
-		if candidate, ok := firstExistingNamedCandidate(options.baseNames(), "", location, options.Formats); ok {
-			candidates = append(candidates, candidate)
+		if _, explicit := explicitFileFormat(location, options.Formats); explicit {
+			if candidate, ok := firstExistingCandidate(options.BaseName, "", location, options.Formats); ok {
+				candidates = append(candidates, candidate)
+			}
+			continue
+		}
+		for _, name := range options.baseNames() {
+			if candidate, ok := firstExistingCandidate(name, "", location, options.formatsForBaseName(name)); ok {
+				candidates = append(candidates, candidate)
+			}
 		}
 	}
 	return candidates
@@ -40,25 +48,20 @@ func discoverProfileFiles(options Options, profiles []string) []Candidate {
 	candidates := make([]Candidate, 0, len(locations)*len(profiles))
 	for _, profile := range profiles {
 		for _, location := range locations {
-			names := make([]string, 0, 2)
-			for _, baseName := range options.baseNames() {
-				names = append(names, baseName+"-"+profile)
+			if _, explicit := explicitFileFormat(location, options.Formats); explicit {
+				if candidate, ok := firstExistingCandidate(options.BaseName, profile, location, options.Formats); ok {
+					candidates = append(candidates, candidate)
+				}
+				continue
 			}
-			if candidate, ok := firstExistingNamedCandidate(names, profile, location, options.Formats); ok {
-				candidates = append(candidates, candidate)
+			for _, baseName := range options.profileBaseNames() {
+				if candidate, ok := firstExistingCandidate(baseName+"-"+profile, profile, location, options.formatsForBaseName(baseName)); ok {
+					candidates = append(candidates, candidate)
+				}
 			}
 		}
 	}
 	return candidates
-}
-
-func firstExistingNamedCandidate(names []string, profile string, location string, formats []Format) (Candidate, bool) {
-	for _, name := range names {
-		if candidate, ok := firstExistingCandidate(name, profile, location, formats); ok {
-			return candidate, true
-		}
-	}
-	return Candidate{}, false
 }
 
 func firstExistingCandidate(name string, profile string, location string, formats []Format) (Candidate, bool) {

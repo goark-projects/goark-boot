@@ -9,22 +9,13 @@ import (
 )
 
 const (
-	defaultBaseName       = "application"
-	legacyDefaultBaseName = "app"
-	defaultResource       = "resource"
+	defaultBaseName = "app"
+	defaultResource = "resource"
 
-	profileKeyGoark  = "goark.profiles.active"
 	profileKeySpring = "spring.profiles.active"
-	profileKeyShort  = "profiles.active"
 )
 
 const (
-	// PropertyConfigLocation 设置配置文件或配置目录位置。
-	PropertyConfigLocation = "goark.config.location"
-	// PropertyConfigName 设置配置文件基础名称。
-	PropertyConfigName = "goark.config.name"
-	// PropertyProfilesActive 设置激活 Profile。
-	PropertyProfilesActive = profileKeyGoark
 	// PropertySpringConfigLocation 设置 Spring Boot 兼容的配置位置。
 	PropertySpringConfigLocation = "spring.config.location"
 	// PropertySpringConfigAdditionalLocation 增加 Spring Boot 兼容的配置位置。
@@ -44,12 +35,6 @@ const (
 )
 
 const (
-	// EnvConfigLocation 设置配置文件或配置目录位置。
-	EnvConfigLocation = "GOARK_CONFIG_LOCATION"
-	// EnvConfigName 设置配置文件基础名称。
-	EnvConfigName = "GOARK_CONFIG_NAME"
-	// EnvProfilesActive 设置激活 Profile。
-	EnvProfilesActive = "GOARK_PROFILES_ACTIVE"
 	// EnvSpringConfigLocation 设置 Spring Boot 兼容的配置位置。
 	EnvSpringConfigLocation = "SPRING_CONFIG_LOCATION"
 	// EnvSpringConfigAdditionalLocation 增加 Spring Boot 兼容的配置位置。
@@ -126,7 +111,7 @@ func WithLocations(locations ...string) Option {
 	}
 }
 
-// WithArgs 应用命令行配置参数，支持 --goark.config.location 和 Spring 兼容键。
+// WithArgs 应用 Spring Boot 风格命令行配置参数。
 func WithArgs(args ...string) Option {
 	copied := append([]string(nil), args...)
 	return func(options *Options) error {
@@ -154,7 +139,7 @@ func newOptions(options ...Option) (Options, error) {
 	config := Options{
 		BaseName:              defaultBaseName,
 		Locations:             defaultLocations,
-		Formats:               []Format{FormatYAML, FormatYAMLFull, FormatTOML, FormatProperties},
+		Formats:               []Format{FormatYAML, FormatYAMLFull, FormatProperties, FormatTOML},
 		CommandLineProperties: make(map[string]string),
 	}
 	if err := applyEnvironment(&config); err != nil {
@@ -175,10 +160,28 @@ func newOptions(options ...Option) (Options, error) {
 }
 
 func (o Options) baseNames() []string {
-	if o.BaseNameExplicit || o.BaseName != defaultBaseName {
-		return []string{o.BaseName}
+	return []string{o.BaseName}
+}
+
+func (o Options) profileBaseNames() []string {
+	return []string{o.BaseName}
+}
+
+func (o Options) formatsForBaseName(name string) []Format {
+	if o.BaseNameExplicit {
+		return o.Formats
 	}
-	return []string{defaultBaseName, legacyDefaultBaseName}
+	allowed := map[Format]struct{}{FormatYAML: {}, FormatProperties: {}}
+	if name == defaultBaseName {
+		allowed[FormatTOML] = struct{}{}
+	}
+	formats := make([]Format, 0, len(allowed))
+	for _, format := range o.Formats {
+		if _, ok := allowed[format]; ok {
+			formats = append(formats, format)
+		}
+	}
+	return formats
 }
 
 func defaultLocations() ([]string, error) {

@@ -136,7 +136,7 @@ func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, er
 		return expandProfiles(env, l.options.Profiles)
 	}
 	values := make([]string, 0, 1)
-	for _, key := range []string{profileKeyGoark, profileKeySpring, profileKeyShort} {
+	for _, key := range []string{PropertySpringProfilesActive} {
 		if value, ok := env.GetProperty(key); ok {
 			values = append(values, value)
 			break

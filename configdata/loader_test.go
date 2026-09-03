@@ -110,6 +110,7 @@ app:
 [app]
 name = "toml"
 `)
+	writeFile(t, filepath.Join(root, "app.properties"), "app.name=properties\n")
 
 	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
 	if err != nil {
@@ -142,7 +143,7 @@ feature:
 	result, err := configdata.Load(
 		context.Background(),
 		configdata.WithArgs(
-			"--goark.config.location", base,
+			"--spring.config.location", base,
 			"--spring.profiles.active=dev",
 		),
 	)
@@ -171,9 +172,9 @@ feature:
 
 func TestLoad_whenEnvironmentSpecifiesLocationNameAndProfile_shouldApplyEnvironment(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv(configdata.EnvConfigLocation, root)
-	t.Setenv(configdata.EnvConfigName, "service")
-	t.Setenv(configdata.EnvProfilesActive, "prod")
+	t.Setenv(configdata.EnvSpringConfigLocation, root)
+	t.Setenv(configdata.EnvSpringConfigName, "service")
+	t.Setenv(configdata.EnvSpringProfilesActive, "prod")
 	writeFile(t, filepath.Join(root, "service.properties"), `
 app.name=base
 `)
@@ -205,49 +206,38 @@ func TestLoad_whenNoConfigFilesExist_shouldReturnBuiltInDefaults(t *testing.T) {
 	if len(result.Sources) != 1 || !result.Sources[0].BuiltIn {
 		t.Fatalf("expected built-in source, got %#v", result.Sources)
 	}
-	if got := mustGet(t, result, "goark.application.name"); got != "goark" {
+	if got := mustGet(t, result, configdata.PropertySpringApplicationName); got != "goark" {
 		t.Fatalf("built-in application name = %q", got)
 	}
+	if got := mustGet(t, result, configdata.PropertySpringConfigName); got != "app" {
+		t.Fatalf("built-in config name = %q, want app", got)
+	}
 }
 
-func TestLoad_whenApplicationAndLegacyAppExist_shouldPreferApplication(t *testing.T) {
+func TestLoad_whenDefaultExists_shouldLoadApp(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "application.yml"), "app:\n  name: application\n")
-	writeFile(t, filepath.Join(root, "app.yml"), "app:\n  name: legacy\n")
+	writeFile(t, filepath.Join(root, "app.yml"), "app:\n  name: goark\n")
 
 	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
 	if err != nil {
 		t.Fatalf("load config failed: %v", err)
 	}
-	if got := mustGet(t, result, "app.name"); got != "application" {
-		t.Fatalf("app.name = %q, want application", got)
-	}
-}
-
-func TestLoad_whenOnlyLegacyAppExists_shouldUseCompatibilityFallback(t *testing.T) {
-	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "app.yml"), "app:\n  name: legacy\n")
-
-	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
-	if err != nil {
-		t.Fatalf("load config failed: %v", err)
-	}
-	if got := mustGet(t, result, "app.name"); got != "legacy" {
-		t.Fatalf("app.name = %q, want legacy", got)
+	if got := mustGet(t, result, "app.name"); got != "goark" {
+		t.Fatalf("app.name = %q, want goark", got)
 	}
 }
 
 func TestLoad_whenPropertySourcesConflict_shouldApplyBootPriority(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("SERVER_PORT", "9090")
-	writeFile(t, filepath.Join(root, "application.yml"), `
+	writeFile(t, filepath.Join(root, "app.yml"), `
 spring:
   profiles:
     active: dev
 server:
   port: 8080
 `)
-	writeFile(t, filepath.Join(root, "application-dev.yml"), "server:\n  port: 8081\n")
+	writeFile(t, filepath.Join(root, "app-dev.yml"), "server:\n  port: 8081\n")
 
 	result, err := configdata.Load(
 		context.Background(),
@@ -273,8 +263,8 @@ server:
 func TestLoad_whenAdditionalLocationProvided_shouldOverrideDefaultLocation(t *testing.T) {
 	base := t.TempDir()
 	additional := t.TempDir()
-	writeFile(t, filepath.Join(base, "application.yml"), "app:\n  name: base\n")
-	writeFile(t, filepath.Join(additional, "application.yml"), "app:\n  name: additional\n")
+	writeFile(t, filepath.Join(base, "app.yml"), "app:\n  name: base\n")
+	writeFile(t, filepath.Join(additional, "app.yml"), "app:\n  name: additional\n")
 
 	result, err := configdata.Load(
 		context.Background(),
@@ -291,7 +281,7 @@ func TestLoad_whenAdditionalLocationProvided_shouldOverrideDefaultLocation(t *te
 
 func TestLoad_whenProfilesUseIncludeDefaultAndGroup_shouldResolveProfileSet(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "application.yml"), `
+	writeFile(t, filepath.Join(root, "app.yml"), `
 spring:
   profiles:
     default: local
@@ -300,7 +290,7 @@ spring:
       local: web,data
 `)
 	for _, profile := range []string{"local", "web", "data", "audit"} {
-		writeFile(t, filepath.Join(root, "application-"+profile+".yml"), "loaded:\n  "+profile+": true\n")
+		writeFile(t, filepath.Join(root, "app-"+profile+".yml"), "loaded:\n  "+profile+": true\n")
 	}
 
 	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
@@ -320,7 +310,7 @@ spring:
 
 func TestLoad_whenProfileGroupsAreCircular_shouldReject(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "application.yml"), `
+	writeFile(t, filepath.Join(root, "app.yml"), `
 spring:
   profiles:
     active: a

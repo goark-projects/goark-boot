@@ -9,9 +9,7 @@ const builtInDefaultSourceName = "config:built-in-defaults"
 // builtInDefaults 返回没有外部配置文件时使用的最低优先级配置。
 func builtInDefaults() map[string]any {
 	return map[string]any{
-		"goark.application.name":      "goark",
 		PropertySpringApplicationName: "goark",
-		PropertyConfigName:            defaultBaseName,
 		PropertySpringConfigName:      defaultBaseName,
 	}
 }

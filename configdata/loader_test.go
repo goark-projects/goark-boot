@@ -10,12 +10,12 @@ import (
 	"goark.dev/boot/configdata"
 )
 
-func TestLoad_whenDefaultAndProfileFilesExist_shouldApplySpringLikePriority(t *testing.T) {
+func TestLoad_whenDefaultAndProfileFilesExist_shouldApplyGoarkPriority(t *testing.T) {
 	root := t.TempDir()
 	conf := filepath.Join(root, "conf")
 	mkdir(t, conf)
 	writeFile(t, filepath.Join(conf, "app.yml"), `
-spring:
+goark:
   profiles:
     active: dev
 server:
@@ -77,7 +77,7 @@ func TestLoad_whenProfilesAreExplicit_shouldIgnoreProfileFromBaseConfig(t *testi
 	conf := filepath.Join(root, "conf")
 	mkdir(t, conf)
 	writeFile(t, filepath.Join(conf, "app.yml"), `
-spring:
+goark:
   profiles:
     active: dev
 server:
@@ -143,8 +143,8 @@ feature:
 	result, err := configdata.Load(
 		context.Background(),
 		configdata.WithArgs(
-			"--spring.config.location", base,
-			"--spring.profiles.active=dev",
+			"--goark.config.location", base,
+			"--goark.profiles.active=dev",
 		),
 	)
 	if err != nil {
@@ -172,9 +172,9 @@ feature:
 
 func TestLoad_whenEnvironmentSpecifiesLocationNameAndProfile_shouldApplyEnvironment(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv(configdata.EnvSpringConfigLocation, root)
-	t.Setenv(configdata.EnvSpringConfigName, "service")
-	t.Setenv(configdata.EnvSpringProfilesActive, "prod")
+	t.Setenv(configdata.EnvConfigLocation, root)
+	t.Setenv(configdata.EnvConfigName, "service")
+	t.Setenv(configdata.EnvProfilesActive, "prod")
 	writeFile(t, filepath.Join(root, "service.properties"), `
 app.name=base
 `)
@@ -206,10 +206,10 @@ func TestLoad_whenNoConfigFilesExist_shouldReturnBuiltInDefaults(t *testing.T) {
 	if len(result.Sources) != 1 || !result.Sources[0].BuiltIn {
 		t.Fatalf("expected built-in source, got %#v", result.Sources)
 	}
-	if got := mustGet(t, result, configdata.PropertySpringApplicationName); got != "goark" {
+	if got := mustGet(t, result, configdata.PropertyApplicationName); got != "goark" {
 		t.Fatalf("built-in application name = %q", got)
 	}
-	if got := mustGet(t, result, configdata.PropertySpringConfigName); got != "app" {
+	if got := mustGet(t, result, configdata.PropertyConfigName); got != "app" {
 		t.Fatalf("built-in config name = %q, want app", got)
 	}
 }
@@ -227,11 +227,31 @@ func TestLoad_whenDefaultExists_shouldLoadApp(t *testing.T) {
 	}
 }
 
+func TestLoad_whenYAMLUsesDirectoryDiscovery_shouldIgnoreYAMLFullExtension(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "app.yaml"), "app:\n  name: ignored\n")
+
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithLocations(root),
+		configdata.WithBaseName("app"),
+	)
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if _, ok := result.Environment.GetProperty("app.name"); ok {
+		t.Fatal("directory discovery must ignore app.yaml")
+	}
+	if len(result.Sources) != 1 || !result.Sources[0].BuiltIn {
+		t.Fatalf("expected only built-in defaults, got %#v", result.Sources)
+	}
+}
+
 func TestLoad_whenPropertySourcesConflict_shouldApplyBootPriority(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("SERVER_PORT", "9090")
 	writeFile(t, filepath.Join(root, "app.yml"), `
-spring:
+goark:
   profiles:
     active: dev
 server:
@@ -269,7 +289,7 @@ func TestLoad_whenAdditionalLocationProvided_shouldOverrideDefaultLocation(t *te
 	result, err := configdata.Load(
 		context.Background(),
 		configdata.WithLocations(base),
-		configdata.WithArgs("--spring.config.additional-location="+additional),
+		configdata.WithArgs("--goark.config.additional-location="+additional),
 	)
 	if err != nil {
 		t.Fatalf("load config failed: %v", err)
@@ -282,7 +302,7 @@ func TestLoad_whenAdditionalLocationProvided_shouldOverrideDefaultLocation(t *te
 func TestLoad_whenProfilesUseIncludeDefaultAndGroup_shouldResolveProfileSet(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "app.yml"), `
-spring:
+goark:
   profiles:
     default: local
     include: audit
@@ -311,7 +331,7 @@ spring:
 func TestLoad_whenProfileGroupsAreCircular_shouldReject(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "app.yml"), `
-spring:
+goark:
   profiles:
     active: a
     group:

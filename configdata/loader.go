@@ -136,7 +136,7 @@ func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, er
 		return expandProfiles(env, l.options.Profiles)
 	}
 	values := make([]string, 0, 1)
-	for _, key := range []string{PropertySpringProfilesActive} {
+	for _, key := range []string{PropertyProfilesActive} {
 		if value, ok := env.GetProperty(key); ok {
 			values = append(values, value)
 			break
@@ -147,14 +147,14 @@ func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, er
 		return nil, err
 	}
 	if len(active) == 0 {
-		if value, ok := env.GetProperty(PropertySpringProfilesDefault); ok {
+		if value, ok := env.GetProperty(PropertyProfilesDefault); ok {
 			active, err = normalizeProfiles([]string{value})
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
-	if value, ok := env.GetProperty(PropertySpringProfilesInclude); ok {
+	if value, ok := env.GetProperty(PropertyProfilesInclude); ok {
 		included, includeErr := normalizeProfiles([]string{value})
 		if includeErr != nil {
 			return nil, includeErr
@@ -188,7 +188,7 @@ func expandProfiles(env *coreenv.StandardEnvironment, profiles []string) ([]stri
 		}
 		visiting[profile] = true
 		expanded = append(expanded, profile)
-		if value, ok := env.GetProperty(PropertySpringProfilesGroupPrefix + profile); ok {
+		if value, ok := env.GetProperty(PropertyProfilesGroupPrefix + profile); ok {
 			members, err := normalizeProfiles([]string{value})
 			if err != nil {
 				return err

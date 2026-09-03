@@ -6,26 +6,26 @@ import (
 )
 
 var (
-	configLocationKeys           = []string{PropertySpringConfigLocation}
-	configAdditionalLocationKeys = []string{PropertySpringConfigAdditionalLocation}
-	configNameKeys               = []string{PropertySpringConfigName}
-	profilesActiveKeys           = []string{PropertySpringProfilesActive}
+	configLocationKeys           = []string{PropertyConfigLocation}
+	configAdditionalLocationKeys = []string{PropertyConfigAdditionalLocation}
+	configNameKeys               = []string{PropertyConfigName}
+	profilesActiveKeys           = []string{PropertyProfilesActive}
 )
 
 // applyEnvironment 应用进程环境变量中的启动配置。
 func applyEnvironment(options *Options) error {
 	values := make(map[string]string, 4)
-	if value := firstNonEmptyEnv(EnvSpringConfigLocation); value != "" {
-		values[PropertySpringConfigLocation] = value
+	if value := firstNonEmptyEnv(EnvConfigLocation); value != "" {
+		values[PropertyConfigLocation] = value
 	}
-	if value := firstNonEmptyEnv(EnvSpringConfigAdditionalLocation); value != "" {
-		values[PropertySpringConfigAdditionalLocation] = value
+	if value := firstNonEmptyEnv(EnvConfigAdditionalLocation); value != "" {
+		values[PropertyConfigAdditionalLocation] = value
 	}
-	if value := firstNonEmptyEnv(EnvSpringConfigName); value != "" {
-		values[PropertySpringConfigName] = value
+	if value := firstNonEmptyEnv(EnvConfigName); value != "" {
+		values[PropertyConfigName] = value
 	}
-	if value := firstNonEmptyEnv(EnvSpringProfilesActive); value != "" {
-		values[PropertySpringProfilesActive] = value
+	if value := firstNonEmptyEnv(EnvProfilesActive); value != "" {
+		values[PropertyProfilesActive] = value
 	}
 	return applyExternalProperties(options, values)
 }

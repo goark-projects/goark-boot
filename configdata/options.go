@@ -12,37 +12,37 @@ const (
 	defaultBaseName = "app"
 	defaultResource = "resource"
 
-	profileKeySpring = "spring.profiles.active"
+	profileKeyGoark = "goark.profiles.active"
 )
 
 const (
-	// PropertySpringConfigLocation 设置 Spring Boot 兼容的配置位置。
-	PropertySpringConfigLocation = "spring.config.location"
-	// PropertySpringConfigAdditionalLocation 增加 Spring Boot 兼容的配置位置。
-	PropertySpringConfigAdditionalLocation = "spring.config.additional-location"
-	// PropertySpringConfigName 设置 Spring Boot 兼容的配置文件基础名称。
-	PropertySpringConfigName = "spring.config.name"
-	// PropertySpringProfilesActive 设置 Spring Boot 兼容的激活 Profile。
-	PropertySpringProfilesActive = profileKeySpring
-	// PropertySpringProfilesInclude 设置附加激活的 Profile。
-	PropertySpringProfilesInclude = "spring.profiles.include"
-	// PropertySpringProfilesDefault 设置没有显式激活项时使用的 Profile。
-	PropertySpringProfilesDefault = "spring.profiles.default"
-	// PropertySpringProfilesGroupPrefix 是 Profile 组属性前缀。
-	PropertySpringProfilesGroupPrefix = "spring.profiles.group."
-	// PropertySpringApplicationName 设置应用名称。
-	PropertySpringApplicationName = "spring.application.name"
+	// PropertyConfigLocation 设置配置文件或配置目录位置。
+	PropertyConfigLocation = "goark.config.location"
+	// PropertyConfigAdditionalLocation 增加配置文件或配置目录位置。
+	PropertyConfigAdditionalLocation = "goark.config.additional-location"
+	// PropertyConfigName 设置配置文件基础名称。
+	PropertyConfigName = "goark.config.name"
+	// PropertyProfilesActive 设置激活 Profile。
+	PropertyProfilesActive = profileKeyGoark
+	// PropertyProfilesInclude 设置附加激活的 Profile。
+	PropertyProfilesInclude = "goark.profiles.include"
+	// PropertyProfilesDefault 设置没有显式激活项时使用的 Profile。
+	PropertyProfilesDefault = "goark.profiles.default"
+	// PropertyProfilesGroupPrefix 是 Profile 组属性前缀。
+	PropertyProfilesGroupPrefix = "goark.profiles.group."
+	// PropertyApplicationName 设置应用名称。
+	PropertyApplicationName = "goark.application.name"
 )
 
 const (
-	// EnvSpringConfigLocation 设置 Spring Boot 兼容的配置位置。
-	EnvSpringConfigLocation = "SPRING_CONFIG_LOCATION"
-	// EnvSpringConfigAdditionalLocation 增加 Spring Boot 兼容的配置位置。
-	EnvSpringConfigAdditionalLocation = "SPRING_CONFIG_ADDITIONAL_LOCATION"
-	// EnvSpringConfigName 设置 Spring Boot 兼容的配置文件基础名称。
-	EnvSpringConfigName = "SPRING_CONFIG_NAME"
-	// EnvSpringProfilesActive 设置 Spring Boot 兼容的激活 Profile。
-	EnvSpringProfilesActive = "SPRING_PROFILES_ACTIVE"
+	// EnvConfigLocation 设置配置文件或配置目录位置。
+	EnvConfigLocation = "GOARK_CONFIG_LOCATION"
+	// EnvConfigAdditionalLocation 增加配置文件或配置目录位置。
+	EnvConfigAdditionalLocation = "GOARK_CONFIG_ADDITIONAL_LOCATION"
+	// EnvConfigName 设置配置文件基础名称。
+	EnvConfigName = "GOARK_CONFIG_NAME"
+	// EnvProfilesActive 设置激活 Profile。
+	EnvProfilesActive = "GOARK_PROFILES_ACTIVE"
 )
 
 // Format 表示配置文件格式。
@@ -111,7 +111,7 @@ func WithLocations(locations ...string) Option {
 	}
 }
 
-// WithArgs 应用 Spring Boot 风格命令行配置参数。
+// WithArgs 应用 Goark 命令行配置参数。
 func WithArgs(args ...string) Option {
 	copied := append([]string(nil), args...)
 	return func(options *Options) error {
@@ -168,11 +168,8 @@ func (o Options) profileBaseNames() []string {
 }
 
 func (o Options) formatsForBaseName(name string) []Format {
-	if o.BaseNameExplicit {
-		return o.Formats
-	}
 	allowed := map[Format]struct{}{FormatYAML: {}, FormatProperties: {}}
-	if name == defaultBaseName {
+	if name == defaultBaseName || o.BaseNameExplicit {
 		allowed[FormatTOML] = struct{}{}
 	}
 	formats := make([]Format, 0, len(allowed))

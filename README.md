@@ -2,100 +2,95 @@
 
 ![goark](assets/goark-readme-logo.png)
 
-`goark boot` is the bootstrap and convention layer for the Goark ecosystem. It provides application startup, lifecycle wiring, configuration loading, and framework module assembly on top of the core [`goark`](https://goark.dev/goark) contracts.
+`goark boot` is the bootstrap and convention layer for the Goark ecosystem. It
+provides application startup, lifecycle wiring, config data loading, and module
+assembly on top of the core [`goark`](https://goark.dev/goark) contracts.
 
-The first boot feature is Spring Boot style config data loading for `app.yml`,
-`app.yaml`, `app.toml`, and `app.properties`.
+## Design Boundary
 
-## Goals
-
-- Provide a Go-native application bootstrap model comparable to Spring Boot's role in the Spring ecosystem.
-- Keep startup composition explicit and observable.
-- Avoid hidden global state and reflection-heavy control flow where plain Go contracts are sufficient.
-- Support future extension modules for web, data access, messaging, configuration, lifecycle, and observability.
-- Keep the boot layer separate from the core framework contracts.
+- `goark.dev/goark/core/env` owns `Environment`, `PropertySource`, conversion,
+  placeholder resolution, and configuration property contracts.
+- `goark.dev/boot/configdata` owns file discovery, config precedence, profiles,
+  and parser integration.
+- `goark.dev/cli` generates configuration property binders and deterministic
+  bean registration at compile time.
+- Runtime startup does not scan structs or create dynamic proxies.
 
 ## Config Data
 
-Config file loading belongs to `boot`, not the `goark` core module. The core module exposes `config.Environment`, `config.PropertySource`, and `config.Binder`; boot owns file discovery, default locations, profile naming, and parser integration.
+Directory discovery recognizes these base files only:
 
-Supported formats:
+```text
+app.yml
+app.properties
+app.toml
+```
 
-- `yml`
-- `yaml`
-- `toml`
-- `properties`
+For an active profile such as `dev`, it recognizes:
 
-Default base files:
+```text
+app-dev.yml
+app-dev.properties
+app-dev.toml
+```
 
-- `app.yml`
-- `app.yaml`
-- `app.toml`
-- `app.properties`
+The `.yaml` format is accepted only when an exact file is supplied explicitly.
+It is never included in directory discovery and no legacy base-name aliases are
+recognized.
 
-Default profile files:
-
-- `app-dev.yml`, `app-prod.yml`, `app-xxx.yml`
-- `app-dev.yaml`, `app-prod.yaml`, `app-xxx.yaml`
-- `app-dev.toml`, `app-prod.toml`, `app-xxx.toml`
-- `app-dev.properties`, `app-prod.properties`, `app-xxx.properties`
-
-`resource` is the default Goark application resource entrypoint. Without an
-explicit location, boot looks for config files in:
+By default, boot searches these locations in ascending priority:
 
 ```text
 <executable-dir>/resource
 <working-dir>/resource
 ```
 
-The working directory resource root has higher priority. If no external config
-file is found, boot installs a built-in default config source.
+Missing files are allowed. If no file is found, boot installs the lowest
+priority built-in defaults:
 
-Startup can override the config location, config base name, and active profiles:
-
-```bash
-go run ./cmd/admin --goark.config.location=resource/app.yml --goark.profiles.active=dev
-go run ./cmd/admin --spring.config.location=resource --spring.profiles.active=prod
+```properties
+goark.application.name=goark
+goark.config.name=app
 ```
 
-Environment variables use the same model:
+### Startup Properties
+
+| Property | Environment variable | Purpose |
+| --- | --- | --- |
+| `goark.config.location` | `GOARK_CONFIG_LOCATION` | Replaces the default locations |
+| `goark.config.additional-location` | `GOARK_CONFIG_ADDITIONAL_LOCATION` | Appends higher-priority locations |
+| `goark.config.name` | `GOARK_CONFIG_NAME` | Changes the discovered base name |
+| `goark.profiles.active` | `GOARK_PROFILES_ACTIVE` | Activates one or more profiles |
+| `goark.profiles.include` | - | Includes additional profiles |
+| `goark.profiles.default` | - | Selects profiles when none are active |
+| `goark.profiles.group.<name>` | - | Expands a named profile group |
+| `goark.application.name` | - | Identifies the application |
+
+Examples:
 
 ```bash
-GOARK_CONFIG_LOCATION=resource
-GOARK_CONFIG_NAME=app
-GOARK_PROFILES_ACTIVE=dev
+go run ./cmd/admin --goark.config.location=resource --goark.profiles.active=dev
+go run ./cmd/admin --goark.config.location=resource/custom.yaml
 ```
 
-Spring-compatible environment variables are also recognized:
+`goark.config.location` accepts directories or exact files. An exact base file
+also enables its sibling profile files, such as `custom-dev.yaml`.
 
-```bash
-SPRING_CONFIG_LOCATION=resource
-SPRING_CONFIG_NAME=app
-SPRING_PROFILES_ACTIVE=dev
-```
+### Precedence
 
-`goark.config.location` and `spring.config.location` accept either directories or
-exact files such as `resource/app.yml`, `resource/app.yaml`, `resource/app.toml`,
-or `resource/app.properties`. When a profile is active and an exact file is
-provided, boot looks for a sibling profile file such as `app-dev.yml`.
+From lower to higher priority:
 
-Priority rules:
+1. Built-in defaults.
+2. Base files, with later locations overriding earlier locations.
+3. Profile files, with later profiles and locations overriding earlier ones.
+4. Process environment variables.
+5. Command-line properties.
 
-- Profile config overrides base config.
-- Explicit command-line args override environment variables and defaults.
-- Explicit Go options override process environment and command-line defaults.
-- The application `resource` directory is used when no location is specified.
-- Later active profiles override earlier active profiles.
-- For the same logical file, format priority is `yml > yaml > toml > properties`.
-- Missing config files are allowed.
+Explicit Go options are applied after process environment and process command
+line parsing. For the same directory and base name, the first existing format
+wins in this order: `yml`, `properties`, `toml`.
 
-Profiles can be provided explicitly with `configdata.WithProfiles("dev")`. If not provided, boot reads the first available profile key from base config:
-
-- `goark.profiles.active`
-- `spring.profiles.active`
-- `profiles.active`
-
-Example:
+### API
 
 ```go
 package main
@@ -107,26 +102,27 @@ import (
 )
 
 func main() {
-	result, err := configdata.Load(context.Background(), configdata.WithProfiles("dev"))
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithProfiles("dev"),
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	_ = result.Environment
+	name, _ := result.Environment.GetProperty("goark.application.name")
+	_ = name
 }
 ```
 
-Config parsing uses [`spf13/viper`](https://github.com/spf13/viper) with the Java properties codec from [`go-viper/encoding`](https://github.com/go-viper/encoding).
+Parsing uses [`spf13/viper`](https://github.com/spf13/viper) and the Java
+properties codec from [`go-viper/encoding`](https://github.com/go-viper/encoding).
 
-## Module
+## Installation
 
 ```bash
 go get goark.dev/boot
 ```
-
-## Repository Status
-
-This repository is in active early development. Public APIs should be treated as unstable until the first tagged release.
 
 ## Development
 
@@ -135,31 +131,29 @@ Requirements:
 - Go 1.25 or later
 - Git
 
-Useful commands:
-
 ```bash
-go mod tidy
 go test ./...
+go test -race ./...
+go vet ./...
 ```
 
 ## Repository Layout
 
 ```text
 .
-├── assets/       # README and brand assets
-├── configdata/   # Spring Boot style config data loading
-├── go.mod        # Go module definition
-├── go.sum        # Go module checksums
-├── LICENSE       # Apache License 2.0
-└── README.md     # Project overview
+|-- assets/       # README and brand assets
+|-- configdata/   # Config discovery, parsing, profiles, and precedence
+|-- go.mod        # Go module definition
+|-- go.sum        # Go module checksums
+|-- LICENSE       # Apache License 2.0
+`-- README.md     # Project overview
 ```
 
 ## Related Repositories
 
 - [`goark.dev/goark`](https://goark.dev/goark): core framework contracts.
-- [`goark.dev/boot`](https://goark.dev/boot): application bootstrap and convention layer.
-- [`goark.dev/cli`](https://goark.dev/cli): scaffolding and compile-time code generation.
+- [`goark.dev/cli`](https://goark.dev/cli): compile-time code generation.
 
 ## License
 
-`goark boot` is released under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+`goark boot` is released under the Apache License 2.0. See [LICENSE](LICENSE).

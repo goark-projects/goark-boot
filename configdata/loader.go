@@ -2,6 +2,7 @@ package configdata
 
 import (
 	"context"
+	"strings"
 
 	coreenv "goark.dev/goark/core/env"
 	arkerrors "goark.dev/goark/errors"
@@ -60,6 +61,9 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := l.addCommandLineSource(env); err != nil {
+		return nil, err
+	}
 	baseSources, err := l.loadBaseSources(ctx, env)
 	if err != nil {
 		return nil, err
@@ -78,14 +82,14 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 
 	sources := append([]LoadedSource(nil), baseSources...)
 	sources = append(sources, profileSources...)
+	source, err := builtInDefaultPropertySource()
+	if err != nil {
+		return nil, err
+	}
+	if err := env.PropertySources().AddLast(source); err != nil {
+		return nil, err
+	}
 	if len(sources) == 0 {
-		source, err := builtInDefaultPropertySource()
-		if err != nil {
-			return nil, err
-		}
-		if err := env.PropertySources().AddLast(source); err != nil {
-			return nil, err
-		}
 		sources = append(sources, builtInLoadedSource())
 	}
 	return &Result{
@@ -119,7 +123,7 @@ func (l *Loader) loadCandidates(ctx context.Context, env *coreenv.StandardEnviro
 		if err != nil {
 			return nil, err
 		}
-		if err := env.PropertySources().AddFirst(source); err != nil {
+		if err := env.PropertySources().AddAfter(coreenv.SystemEnvironmentPropertySourceName, source); err != nil {
 			return nil, err
 		}
 		loaded = append(loaded, candidate.LoadedSource())
@@ -129,7 +133,7 @@ func (l *Loader) loadCandidates(ctx context.Context, env *coreenv.StandardEnviro
 
 func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, error) {
 	if l.options.ProfilesExplicit {
-		return append([]string(nil), l.options.Profiles...), nil
+		return expandProfiles(env, l.options.Profiles)
 	}
 	values := make([]string, 0, 1)
 	for _, key := range []string{profileKeyGoark, profileKeySpring, profileKeyShort} {
@@ -138,7 +142,90 @@ func (l *Loader) resolveProfiles(env *coreenv.StandardEnvironment) ([]string, er
 			break
 		}
 	}
-	return normalizeProfiles(values)
+	active, err := normalizeProfiles(values)
+	if err != nil {
+		return nil, err
+	}
+	if len(active) == 0 {
+		if value, ok := env.GetProperty(PropertySpringProfilesDefault); ok {
+			active, err = normalizeProfiles([]string{value})
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	if value, ok := env.GetProperty(PropertySpringProfilesInclude); ok {
+		included, includeErr := normalizeProfiles([]string{value})
+		if includeErr != nil {
+			return nil, includeErr
+		}
+		active = appendUnique(active, included...)
+	}
+	return expandProfiles(env, active)
+}
+
+func (l *Loader) addCommandLineSource(env *coreenv.StandardEnvironment) error {
+	if len(l.options.CommandLineProperties) == 0 {
+		return nil
+	}
+	source, err := coreenv.NewMapPropertySource("commandLineArgs", propertyMap(l.options.CommandLineProperties))
+	if err != nil {
+		return err
+	}
+	return env.PropertySources().AddFirst(source)
+}
+
+func expandProfiles(env *coreenv.StandardEnvironment, profiles []string) ([]string, error) {
+	expanded := make([]string, 0, len(profiles))
+	visiting := make(map[string]bool)
+	var add func(string) error
+	add = func(profile string) error {
+		if visiting[profile] {
+			return arkerrors.Newf(arkerrors.CodeInvalidArgument, "circular profile group involving %q", profile)
+		}
+		if containsProfile(expanded, profile) {
+			return nil
+		}
+		visiting[profile] = true
+		expanded = append(expanded, profile)
+		if value, ok := env.GetProperty(PropertySpringProfilesGroupPrefix + profile); ok {
+			members, err := normalizeProfiles([]string{value})
+			if err != nil {
+				return err
+			}
+			for _, member := range members {
+				if err := add(member); err != nil {
+					return err
+				}
+			}
+		}
+		visiting[profile] = false
+		return nil
+	}
+	for _, profile := range profiles {
+		if err := add(strings.TrimSpace(profile)); err != nil {
+			return nil, err
+		}
+	}
+	return expanded, nil
+}
+
+func appendUnique(values []string, additions ...string) []string {
+	for _, value := range additions {
+		if !containsProfile(values, value) {
+			values = append(values, value)
+		}
+	}
+	return values
+}
+
+func containsProfile(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func applyActiveProfiles(env *coreenv.StandardEnvironment, profiles []string) error {

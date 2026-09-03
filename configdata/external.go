@@ -5,30 +5,26 @@ import (
 	"strings"
 )
 
-const (
-	propertySpringConfigLocation = "spring.config.location"
-	propertySpringConfigName     = "spring.config.name"
-	envSpringConfigLocation      = "SPRING_CONFIG_LOCATION"
-	envSpringConfigName          = "SPRING_CONFIG_NAME"
-	envSpringProfilesActive      = "SPRING_PROFILES_ACTIVE"
-)
-
 var (
-	configLocationKeys = []string{PropertyConfigLocation, propertySpringConfigLocation}
-	configNameKeys     = []string{PropertyConfigName, propertySpringConfigName}
-	profilesActiveKeys = []string{PropertyProfilesActive, profileKeySpring, profileKeyShort}
+	configLocationKeys           = []string{PropertyConfigLocation, PropertySpringConfigLocation}
+	configAdditionalLocationKeys = []string{PropertySpringConfigAdditionalLocation}
+	configNameKeys               = []string{PropertyConfigName, PropertySpringConfigName}
+	profilesActiveKeys           = []string{PropertyProfilesActive, profileKeySpring, profileKeyShort}
 )
 
 // applyEnvironment 应用进程环境变量中的启动配置。
 func applyEnvironment(options *Options) error {
-	values := make(map[string]string, 3)
-	if value := firstNonEmptyEnv(EnvConfigLocation, envSpringConfigLocation); value != "" {
+	values := make(map[string]string, 4)
+	if value := firstNonEmptyEnv(EnvConfigLocation, EnvSpringConfigLocation); value != "" {
 		values[PropertyConfigLocation] = value
 	}
-	if value := firstNonEmptyEnv(EnvConfigName, envSpringConfigName); value != "" {
+	if value := firstNonEmptyEnv(EnvSpringConfigAdditionalLocation); value != "" {
+		values[PropertySpringConfigAdditionalLocation] = value
+	}
+	if value := firstNonEmptyEnv(EnvConfigName, EnvSpringConfigName); value != "" {
 		values[PropertyConfigName] = value
 	}
-	if value := firstNonEmptyEnv(EnvProfilesActive, envSpringProfilesActive); value != "" {
+	if value := firstNonEmptyEnv(EnvProfilesActive, EnvSpringProfilesActive); value != "" {
 		values[PropertyProfilesActive] = value
 	}
 	return applyExternalProperties(options, values)
@@ -36,7 +32,16 @@ func applyEnvironment(options *Options) error {
 
 // applyCommandLine 应用命令行中的启动配置。
 func applyCommandLine(options *Options, args []string) error {
-	return applyExternalProperties(options, commandLineProperties(args))
+	values := commandLineProperties(args)
+	if options != nil {
+		if options.CommandLineProperties == nil {
+			options.CommandLineProperties = make(map[string]string, len(values))
+		}
+		for key, value := range values {
+			options.CommandLineProperties[key] = value
+		}
+	}
+	return applyExternalProperties(options, values)
 }
 
 func applyExternalProperties(options *Options, values map[string]string) error {
@@ -47,6 +52,13 @@ func applyExternalProperties(options *Options, values map[string]string) error {
 		if err := WithLocations(value)(options); err != nil {
 			return err
 		}
+	}
+	if value, ok := firstProperty(values, configAdditionalLocationKeys); ok {
+		locations, err := normalizeLocations([]string{value})
+		if err != nil {
+			return err
+		}
+		options.AdditionalLocations = locations
 	}
 	if value, ok := firstProperty(values, configNameKeys); ok {
 		if err := WithBaseName(value)(options); err != nil {
@@ -91,7 +103,7 @@ func commandLineProperty(args []string, index int) (string, string, bool) {
 func longOptionProperty(args []string, index int, body string) (string, string, bool) {
 	key, value, found := strings.Cut(body, "=")
 	key = strings.TrimSpace(key)
-	if !isKnownExternalKey(key) {
+	if key == "" {
 		return "", "", false
 	}
 	if found {
@@ -106,7 +118,7 @@ func longOptionProperty(args []string, index int, body string) (string, string, 
 func systemProperty(body string) (string, string, bool) {
 	key, value, found := strings.Cut(body, "=")
 	key = strings.TrimSpace(key)
-	if !found || !isKnownExternalKey(key) {
+	if !found || key == "" {
 		return "", "", false
 	}
 	return key, strings.TrimSpace(value), true
@@ -128,15 +140,4 @@ func firstNonEmptyEnv(names ...string) string {
 		}
 	}
 	return ""
-}
-
-func isKnownExternalKey(key string) bool {
-	for _, group := range [][]string{configLocationKeys, configNameKeys, profilesActiveKeys} {
-		for _, item := range group {
-			if key == item {
-				return true
-			}
-		}
-	}
-	return false
 }

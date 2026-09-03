@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	defaultBaseName = "app"
-	defaultResource = "resource"
+	defaultBaseName       = "application"
+	legacyDefaultBaseName = "app"
+	defaultResource       = "resource"
 
 	profileKeyGoark  = "goark.profiles.active"
 	profileKeySpring = "spring.profiles.active"
@@ -24,6 +25,22 @@ const (
 	PropertyConfigName = "goark.config.name"
 	// PropertyProfilesActive 设置激活 Profile。
 	PropertyProfilesActive = profileKeyGoark
+	// PropertySpringConfigLocation 设置 Spring Boot 兼容的配置位置。
+	PropertySpringConfigLocation = "spring.config.location"
+	// PropertySpringConfigAdditionalLocation 增加 Spring Boot 兼容的配置位置。
+	PropertySpringConfigAdditionalLocation = "spring.config.additional-location"
+	// PropertySpringConfigName 设置 Spring Boot 兼容的配置文件基础名称。
+	PropertySpringConfigName = "spring.config.name"
+	// PropertySpringProfilesActive 设置 Spring Boot 兼容的激活 Profile。
+	PropertySpringProfilesActive = profileKeySpring
+	// PropertySpringProfilesInclude 设置附加激活的 Profile。
+	PropertySpringProfilesInclude = "spring.profiles.include"
+	// PropertySpringProfilesDefault 设置没有显式激活项时使用的 Profile。
+	PropertySpringProfilesDefault = "spring.profiles.default"
+	// PropertySpringProfilesGroupPrefix 是 Profile 组属性前缀。
+	PropertySpringProfilesGroupPrefix = "spring.profiles.group."
+	// PropertySpringApplicationName 设置应用名称。
+	PropertySpringApplicationName = "spring.application.name"
 )
 
 const (
@@ -33,6 +50,14 @@ const (
 	EnvConfigName = "GOARK_CONFIG_NAME"
 	// EnvProfilesActive 设置激活 Profile。
 	EnvProfilesActive = "GOARK_PROFILES_ACTIVE"
+	// EnvSpringConfigLocation 设置 Spring Boot 兼容的配置位置。
+	EnvSpringConfigLocation = "SPRING_CONFIG_LOCATION"
+	// EnvSpringConfigAdditionalLocation 增加 Spring Boot 兼容的配置位置。
+	EnvSpringConfigAdditionalLocation = "SPRING_CONFIG_ADDITIONAL_LOCATION"
+	// EnvSpringConfigName 设置 Spring Boot 兼容的配置文件基础名称。
+	EnvSpringConfigName = "SPRING_CONFIG_NAME"
+	// EnvSpringProfilesActive 设置 Spring Boot 兼容的激活 Profile。
+	EnvSpringProfilesActive = "SPRING_PROFILES_ACTIVE"
 )
 
 // Format 表示配置文件格式。
@@ -47,11 +72,14 @@ const (
 
 // Options 描述配置文件加载规则。
 type Options struct {
-	BaseName         string
-	Profiles         []string
-	ProfilesExplicit bool
-	Locations        []string
-	Formats          []Format
+	BaseName              string
+	BaseNameExplicit      bool
+	Profiles              []string
+	ProfilesExplicit      bool
+	Locations             []string
+	AdditionalLocations   []string
+	Formats               []Format
+	CommandLineProperties map[string]string
 }
 
 // Option 调整配置加载规则。
@@ -68,6 +96,7 @@ func WithBaseName(name string) Option {
 			return arkerrors.Newf(arkerrors.CodeInvalidArgument, "config base name %q must not contain path separators", name)
 		}
 		options.BaseName = name
+		options.BaseNameExplicit = true
 		return nil
 	}
 }
@@ -123,9 +152,10 @@ func newOptions(options ...Option) (Options, error) {
 		return Options{}, err
 	}
 	config := Options{
-		BaseName:  defaultBaseName,
-		Locations: defaultLocations,
-		Formats:   []Format{FormatYAML, FormatYAMLFull, FormatTOML, FormatProperties},
+		BaseName:              defaultBaseName,
+		Locations:             defaultLocations,
+		Formats:               []Format{FormatYAML, FormatYAMLFull, FormatTOML, FormatProperties},
+		CommandLineProperties: make(map[string]string),
 	}
 	if err := applyEnvironment(&config); err != nil {
 		return Options{}, err
@@ -142,6 +172,13 @@ func newOptions(options ...Option) (Options, error) {
 		}
 	}
 	return config, nil
+}
+
+func (o Options) baseNames() []string {
+	if o.BaseNameExplicit || o.BaseName != defaultBaseName {
+		return []string{o.BaseName}
+	}
+	return []string{defaultBaseName, legacyDefaultBaseName}
 }
 
 func defaultLocations() ([]string, error) {

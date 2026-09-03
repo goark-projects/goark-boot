@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/go-viper/encoding/javaproperties v0.1.0
 	github.com/spf13/viper v1.21.0
-	goark.dev/goark v0.0.0-20260829150741-5da2fd1fb184
+	goark.dev/goark v0.0.0-20260903134136-40d079352f43
 )
 
 require (

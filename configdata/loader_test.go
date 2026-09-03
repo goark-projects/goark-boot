@@ -210,6 +210,130 @@ func TestLoad_whenNoConfigFilesExist_shouldReturnBuiltInDefaults(t *testing.T) {
 	}
 }
 
+func TestLoad_whenApplicationAndLegacyAppExist_shouldPreferApplication(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "application.yml"), "app:\n  name: application\n")
+	writeFile(t, filepath.Join(root, "app.yml"), "app:\n  name: legacy\n")
+
+	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if got := mustGet(t, result, "app.name"); got != "application" {
+		t.Fatalf("app.name = %q, want application", got)
+	}
+}
+
+func TestLoad_whenOnlyLegacyAppExists_shouldUseCompatibilityFallback(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "app.yml"), "app:\n  name: legacy\n")
+
+	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if got := mustGet(t, result, "app.name"); got != "legacy" {
+		t.Fatalf("app.name = %q, want legacy", got)
+	}
+}
+
+func TestLoad_whenPropertySourcesConflict_shouldApplyBootPriority(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("SERVER_PORT", "9090")
+	writeFile(t, filepath.Join(root, "application.yml"), `
+spring:
+  profiles:
+    active: dev
+server:
+  port: 8080
+`)
+	writeFile(t, filepath.Join(root, "application-dev.yml"), "server:\n  port: 8081\n")
+
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithLocations(root),
+		configdata.WithArgs("--server.port=10090"),
+	)
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if got := mustGet(t, result, "server.port"); got != "10090" {
+		t.Fatalf("server.port = %q, want command-line value", got)
+	}
+
+	result, err = configdata.Load(context.Background(), configdata.WithLocations(root), configdata.WithArgs())
+	if err != nil {
+		t.Fatalf("load config without explicit args failed: %v", err)
+	}
+	if got := mustGet(t, result, "server.port"); got != "9090" {
+		t.Fatalf("server.port = %q, want environment value", got)
+	}
+}
+
+func TestLoad_whenAdditionalLocationProvided_shouldOverrideDefaultLocation(t *testing.T) {
+	base := t.TempDir()
+	additional := t.TempDir()
+	writeFile(t, filepath.Join(base, "application.yml"), "app:\n  name: base\n")
+	writeFile(t, filepath.Join(additional, "application.yml"), "app:\n  name: additional\n")
+
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithLocations(base),
+		configdata.WithArgs("--spring.config.additional-location="+additional),
+	)
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if got := mustGet(t, result, "app.name"); got != "additional" {
+		t.Fatalf("app.name = %q, want additional", got)
+	}
+}
+
+func TestLoad_whenProfilesUseIncludeDefaultAndGroup_shouldResolveProfileSet(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "application.yml"), `
+spring:
+  profiles:
+    default: local
+    include: audit
+    group:
+      local: web,data
+`)
+	for _, profile := range []string{"local", "web", "data", "audit"} {
+		writeFile(t, filepath.Join(root, "application-"+profile+".yml"), "loaded:\n  "+profile+": true\n")
+	}
+
+	result, err := configdata.Load(context.Background(), configdata.WithLocations(root))
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	want := []string{"local", "web", "data", "audit"}
+	if !reflect.DeepEqual(result.Profiles, want) {
+		t.Fatalf("profiles = %#v, want %#v", result.Profiles, want)
+	}
+	for _, profile := range want {
+		if got := mustGet(t, result, "loaded."+profile); got != "true" {
+			t.Fatalf("loaded.%s = %q, want true", profile, got)
+		}
+	}
+}
+
+func TestLoad_whenProfileGroupsAreCircular_shouldReject(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "application.yml"), `
+spring:
+  profiles:
+    active: a
+    group:
+      a: b
+      b: a
+`)
+
+	if _, err := configdata.Load(context.Background(), configdata.WithLocations(root)); err == nil {
+		t.Fatal("load config should reject circular profile groups")
+	}
+}
+
 func mustGet(t *testing.T, result *configdata.Result, key string) string {
 	t.Helper()
 	value, ok := result.Environment.GetProperty(key)

@@ -25,9 +25,10 @@ type LoadedSource struct {
 }
 
 func discoverBaseFiles(options Options) []Candidate {
-	candidates := make([]Candidate, 0, len(options.Locations))
-	for _, location := range options.Locations {
-		if candidate, ok := firstExistingCandidate(options.BaseName, "", location, options.Formats); ok {
+	locations := append(append([]string(nil), options.Locations...), options.AdditionalLocations...)
+	candidates := make([]Candidate, 0, len(locations))
+	for _, location := range locations {
+		if candidate, ok := firstExistingNamedCandidate(options.baseNames(), "", location, options.Formats); ok {
 			candidates = append(candidates, candidate)
 		}
 	}
@@ -35,16 +36,29 @@ func discoverBaseFiles(options Options) []Candidate {
 }
 
 func discoverProfileFiles(options Options, profiles []string) []Candidate {
-	candidates := make([]Candidate, 0, len(options.Locations)*len(profiles))
+	locations := append(append([]string(nil), options.Locations...), options.AdditionalLocations...)
+	candidates := make([]Candidate, 0, len(locations)*len(profiles))
 	for _, profile := range profiles {
-		for _, location := range options.Locations {
-			name := options.BaseName + "-" + profile
-			if candidate, ok := firstExistingCandidate(name, profile, location, options.Formats); ok {
+		for _, location := range locations {
+			names := make([]string, 0, 2)
+			for _, baseName := range options.baseNames() {
+				names = append(names, baseName+"-"+profile)
+			}
+			if candidate, ok := firstExistingNamedCandidate(names, profile, location, options.Formats); ok {
 				candidates = append(candidates, candidate)
 			}
 		}
 	}
 	return candidates
+}
+
+func firstExistingNamedCandidate(names []string, profile string, location string, formats []Format) (Candidate, bool) {
+	for _, name := range names {
+		if candidate, ok := firstExistingCandidate(name, profile, location, formats); ok {
+			return candidate, true
+		}
+	}
+	return Candidate{}, false
 }
 
 func firstExistingCandidate(name string, profile string, location string, formats []Format) (Candidate, bool) {

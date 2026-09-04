@@ -65,6 +65,7 @@ type Options struct {
 	AdditionalLocations   []string
 	Formats               []Format
 	CommandLineProperties map[string]string
+	SystemProperties      map[string]string
 }
 
 // Option 调整配置加载规则。
@@ -115,7 +116,7 @@ func WithLocations(locations ...string) Option {
 func WithArgs(args ...string) Option {
 	copied := append([]string(nil), args...)
 	return func(options *Options) error {
-		return applyCommandLine(options, copied)
+		return applyArguments(options, copied)
 	}
 }
 
@@ -141,11 +142,12 @@ func newOptions(options ...Option) (Options, error) {
 		Locations:             defaultLocations,
 		Formats:               []Format{FormatYAML, FormatYAMLFull, FormatProperties, FormatTOML},
 		CommandLineProperties: make(map[string]string),
+		SystemProperties:      make(map[string]string),
 	}
 	if err := applyEnvironment(&config); err != nil {
 		return Options{}, err
 	}
-	if err := applyCommandLine(&config, os.Args[1:]); err != nil {
+	if err := applyArguments(&config, os.Args[1:]); err != nil {
 		return Options{}, err
 	}
 	for _, option := range options {

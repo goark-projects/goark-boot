@@ -61,6 +61,9 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := l.addSystemPropertiesSource(env); err != nil {
+		return nil, err
+	}
 	if err := l.addCommandLineSource(env); err != nil {
 		return nil, err
 	}
@@ -97,6 +100,17 @@ func (l *Loader) Load(ctx context.Context) (*Result, error) {
 		Sources:     sources,
 		Profiles:    append([]string(nil), profiles...),
 	}, nil
+}
+
+func (l *Loader) addSystemPropertiesSource(env *coreenv.StandardEnvironment) error {
+	if len(l.options.SystemProperties) == 0 {
+		return nil
+	}
+	source, err := coreenv.NewMapPropertySource(coreenv.SystemPropertiesPropertySourceName, propertyMap(l.options.SystemProperties))
+	if err != nil {
+		return err
+	}
+	return env.PropertySources().Replace(coreenv.SystemPropertiesPropertySourceName, source)
 }
 
 func (l *Loader) loadBaseSources(ctx context.Context, env *coreenv.StandardEnvironment) ([]LoadedSource, error) {

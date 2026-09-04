@@ -280,6 +280,40 @@ server:
 	}
 }
 
+func TestLoad_whenCommandLinePrecedesLaterSystemProperty_shouldKeepLayerPriority(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("SERVER_PORT", "9090")
+	writeFile(t, filepath.Join(root, "app.yml"), "server:\n  port: 8080\n")
+
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithLocations(root),
+		configdata.WithArgs("--server.port=10090", "-Dserver.port=9190"),
+	)
+	if err != nil {
+		t.Fatalf("load config failed: %v", err)
+	}
+	if got := mustGet(t, result, "server.port"); got != "10090" {
+		t.Fatalf("server.port = %q, want command-line value", got)
+	}
+	systemProperties, ok := result.Environment.PropertySources().Get("systemProperties")
+	if !ok {
+		t.Fatal("systemProperties source is missing")
+	}
+	value, ok := systemProperties.GetProperty("server.port")
+	if !ok || value != "9190" {
+		t.Fatalf("system property server.port = %#v, %v", value, ok)
+	}
+	commandLine, ok := result.Environment.PropertySources().Get("commandLineArgs")
+	if !ok {
+		t.Fatal("commandLineArgs source is missing")
+	}
+	value, ok = commandLine.GetProperty("server.port")
+	if !ok || value != "10090" {
+		t.Fatalf("command-line server.port = %#v, %v", value, ok)
+	}
+}
+
 func TestLoad_whenAdditionalLocationProvided_shouldOverrideDefaultLocation(t *testing.T) {
 	base := t.TempDir()
 	additional := t.TempDir()

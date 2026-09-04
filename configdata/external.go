@@ -30,18 +30,28 @@ func applyEnvironment(options *Options) error {
 	return applyExternalProperties(options, values)
 }
 
-// applyCommandLine 应用命令行中的启动配置。
-func applyCommandLine(options *Options, args []string) error {
-	values := commandLineProperties(args)
+// applyArguments 按系统属性和命令行属性的固定层级应用启动参数。
+func applyArguments(options *Options, args []string) error {
+	systemValues := systemProperties(args)
+	commandValues := commandLineProperties(args)
 	if options != nil {
-		if options.CommandLineProperties == nil {
-			options.CommandLineProperties = make(map[string]string, len(values))
+		if options.SystemProperties == nil {
+			options.SystemProperties = make(map[string]string, len(systemValues))
 		}
-		for key, value := range values {
+		for key, value := range systemValues {
+			options.SystemProperties[key] = value
+		}
+		if options.CommandLineProperties == nil {
+			options.CommandLineProperties = make(map[string]string, len(commandValues))
+		}
+		for key, value := range commandValues {
 			options.CommandLineProperties[key] = value
 		}
 	}
-	return applyExternalProperties(options, values)
+	if err := applyExternalProperties(options, systemValues); err != nil {
+		return err
+	}
+	return applyExternalProperties(options, commandValues)
 }
 
 func applyExternalProperties(options *Options, values map[string]string) error {
@@ -76,7 +86,7 @@ func applyExternalProperties(options *Options, values map[string]string) error {
 func commandLineProperties(args []string) map[string]string {
 	values := make(map[string]string)
 	for index := 0; index < len(args); index++ {
-		key, value, ok := commandLineProperty(args, index)
+		key, value, ok := longOptionPropertyAt(args, index)
 		if !ok {
 			continue
 		}
@@ -88,16 +98,27 @@ func commandLineProperties(args []string) map[string]string {
 	return values
 }
 
-func commandLineProperty(args []string, index int) (string, string, bool) {
+func longOptionPropertyAt(args []string, index int) (string, string, bool) {
 	arg := strings.TrimSpace(args[index])
-	switch {
-	case strings.HasPrefix(arg, "--"):
-		return longOptionProperty(args, index, strings.TrimPrefix(arg, "--"))
-	case strings.HasPrefix(arg, "-D"):
-		return systemProperty(strings.TrimPrefix(arg, "-D"))
-	default:
+	if !strings.HasPrefix(arg, "--") {
 		return "", "", false
 	}
+	return longOptionProperty(args, index, strings.TrimPrefix(arg, "--"))
+}
+
+func systemProperties(args []string) map[string]string {
+	values := make(map[string]string)
+	for _, raw := range args {
+		arg := strings.TrimSpace(raw)
+		if !strings.HasPrefix(arg, "-D") {
+			continue
+		}
+		key, value, ok := systemProperty(strings.TrimPrefix(arg, "-D"))
+		if ok {
+			values[key] = value
+		}
+	}
+	return values
 }
 
 func longOptionProperty(args []string, index int, body string) (string, string, bool) {

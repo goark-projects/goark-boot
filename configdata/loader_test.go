@@ -66,7 +66,8 @@ server.host=127.0.0.1
 	if len(result.Sources) != 4 {
 		t.Fatalf("expected four loaded sources, got %#v", result.Sources)
 	}
-	if result.Sources[0].Location != filepath.Clean(conf) || result.Sources[3].Location != filepath.Clean(root) {
+	if result.Sources[0].Location != filepath.Clean(conf) ||
+		result.Sources[3].Location != filepath.Clean(root) {
 		t.Fatalf("unexpected source order: %#v", result.Sources)
 	}
 }
@@ -87,7 +88,11 @@ server:
   port: 9090
 `)
 
-	result, err := configdata.Load(context.Background(), configdata.WithLocations(conf, root), configdata.WithProfiles("prod"))
+	result, err := configdata.Load(
+		context.Background(),
+		configdata.WithLocations(conf, root),
+		configdata.WithProfiles("prod"),
+	)
 	if err != nil {
 		t.Fatalf("load config failed: %v", err)
 	}
@@ -123,7 +128,9 @@ name = "toml"
 	}
 }
 
-func TestLoad_whenArgsSpecifyConfigFileAndProfile_shouldLoadExactFileAndProfileVariant(t *testing.T) {
+func TestLoad_whenArgsSpecifyConfigFileAndProfile_shouldLoadExactFileAndProfileVariant(
+	t *testing.T,
+) {
 	root := t.TempDir()
 	base := filepath.Join(root, "custom.yaml")
 	writeFile(t, base, `
@@ -270,7 +277,11 @@ server:
 		t.Fatalf("server.port = %q, want command-line value", got)
 	}
 
-	result, err = configdata.Load(context.Background(), configdata.WithLocations(root), configdata.WithArgs())
+	result, err = configdata.Load(
+		context.Background(),
+		configdata.WithLocations(root),
+		configdata.WithArgs(),
+	)
 	if err != nil {
 		t.Fatalf("load config without explicit args failed: %v", err)
 	}

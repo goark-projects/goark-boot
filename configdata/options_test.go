@@ -6,7 +6,9 @@ import (
 	"testing"
 )
 
-func TestDefaultLocationsFor_whenWorkingDirDiffers_shouldIncludeResourceRootsInPriorityOrder(t *testing.T) {
+func TestDefaultLocationsFor_whenWorkingDirDiffers_shouldIncludeResourceRootsInPriorityOrder(
+	t *testing.T,
+) {
 	root := t.TempDir()
 	executableDir := filepath.Join(root, "bin")
 	workingDir := filepath.Join(root, "app")

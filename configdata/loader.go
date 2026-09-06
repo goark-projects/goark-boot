@@ -106,24 +106,38 @@ func (l *Loader) addSystemPropertiesSource(env *coreenv.StandardEnvironment) err
 	if len(l.options.SystemProperties) == 0 {
 		return nil
 	}
-	source, err := coreenv.NewMapPropertySource(coreenv.SystemPropertiesPropertySourceName, propertyMap(l.options.SystemProperties))
+	source, err := coreenv.NewMapPropertySource(
+		coreenv.SystemPropertiesPropertySourceName,
+		propertyMap(l.options.SystemProperties),
+	)
 	if err != nil {
 		return err
 	}
 	return env.PropertySources().Replace(coreenv.SystemPropertiesPropertySourceName, source)
 }
 
-func (l *Loader) loadBaseSources(ctx context.Context, env *coreenv.StandardEnvironment) ([]LoadedSource, error) {
+func (l *Loader) loadBaseSources(
+	ctx context.Context,
+	env *coreenv.StandardEnvironment,
+) ([]LoadedSource, error) {
 	candidates := discoverBaseFiles(l.options)
 	return l.loadCandidates(ctx, env, candidates)
 }
 
-func (l *Loader) loadProfileSources(ctx context.Context, env *coreenv.StandardEnvironment, profiles []string) ([]LoadedSource, error) {
+func (l *Loader) loadProfileSources(
+	ctx context.Context,
+	env *coreenv.StandardEnvironment,
+	profiles []string,
+) ([]LoadedSource, error) {
 	candidates := discoverProfileFiles(l.options, profiles)
 	return l.loadCandidates(ctx, env, candidates)
 }
 
-func (l *Loader) loadCandidates(ctx context.Context, env *coreenv.StandardEnvironment, candidates []Candidate) ([]LoadedSource, error) {
+func (l *Loader) loadCandidates(
+	ctx context.Context,
+	env *coreenv.StandardEnvironment,
+	candidates []Candidate,
+) ([]LoadedSource, error) {
 	loaded := make([]LoadedSource, 0, len(candidates))
 	for _, candidate := range candidates {
 		if err := ctx.Err(); err != nil {
@@ -137,7 +151,10 @@ func (l *Loader) loadCandidates(ctx context.Context, env *coreenv.StandardEnviro
 		if err != nil {
 			return nil, err
 		}
-		if err := env.PropertySources().AddAfter(coreenv.SystemEnvironmentPropertySourceName, source); err != nil {
+		if err := env.PropertySources().AddAfter(
+			coreenv.SystemEnvironmentPropertySourceName,
+			source,
+		); err != nil {
 			return nil, err
 		}
 		loaded = append(loaded, candidate.LoadedSource())
@@ -182,7 +199,10 @@ func (l *Loader) addCommandLineSource(env *coreenv.StandardEnvironment) error {
 	if len(l.options.CommandLineProperties) == 0 {
 		return nil
 	}
-	source, err := coreenv.NewMapPropertySource("commandLineArgs", propertyMap(l.options.CommandLineProperties))
+	source, err := coreenv.NewMapPropertySource(
+		"commandLineArgs",
+		propertyMap(l.options.CommandLineProperties),
+	)
 	if err != nil {
 		return err
 	}
@@ -195,7 +215,11 @@ func expandProfiles(env *coreenv.StandardEnvironment, profiles []string) ([]stri
 	var add func(string) error
 	add = func(profile string) error {
 		if visiting[profile] {
-			return arkerrors.Newf(arkerrors.CodeInvalidArgument, "circular profile group involving %q", profile)
+			return arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"circular profile group involving %q",
+				profile,
+			)
 		}
 		if containsProfile(expanded, profile) {
 			return nil

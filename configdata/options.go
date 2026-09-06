@@ -79,7 +79,11 @@ func WithBaseName(name string) Option {
 			return arkerrors.New(arkerrors.CodeInvalidArgument, "config base name is empty")
 		}
 		if strings.ContainsAny(name, `/\`) {
-			return arkerrors.Newf(arkerrors.CodeInvalidArgument, "config base name %q must not contain path separators", name)
+			return arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"config base name %q must not contain path separators",
+				name,
+			)
 		}
 		options.BaseName = name
 		options.BaseNameExplicit = true
@@ -186,12 +190,20 @@ func (o Options) formatsForBaseName(name string) []Format {
 func defaultLocations() ([]string, error) {
 	executable, err := os.Executable()
 	if err != nil {
-		return nil, arkerrors.Wrap(arkerrors.CodeInvalidArgument, err, "failed to resolve executable path")
+		return nil, arkerrors.Wrap(
+			arkerrors.CodeInvalidArgument,
+			err,
+			"failed to resolve executable path",
+		)
 	}
 	executableDir := filepath.Dir(executable)
 	workingDir, err := os.Getwd()
 	if err != nil {
-		return nil, arkerrors.Wrap(arkerrors.CodeInvalidArgument, err, "failed to resolve working directory")
+		return nil, arkerrors.Wrap(
+			arkerrors.CodeInvalidArgument,
+			err,
+			"failed to resolve working directory",
+		)
 	}
 	return defaultLocationsFor(executableDir, workingDir)
 }
@@ -221,7 +233,12 @@ func normalizeLocations(locations []string) ([]string, error) {
 		location = strings.TrimPrefix(location, "file:")
 		absolute, err := filepath.Abs(location)
 		if err != nil {
-			return nil, arkerrors.Wrapf(arkerrors.CodeInvalidArgument, err, "failed to resolve config location %q", location)
+			return nil, arkerrors.Wrapf(
+				arkerrors.CodeInvalidArgument,
+				err,
+				"failed to resolve config location %q",
+				location,
+			)
 		}
 		absolute = filepath.Clean(absolute)
 		if _, exists := seen[absolute]; exists {
@@ -253,7 +270,11 @@ func normalizeProfiles(profiles []string) ([]string, error) {
 	normalized := make([]string, 0, len(profiles))
 	for _, profile := range splitProfiles(profiles) {
 		if strings.ContainsAny(profile, `/\`) {
-			return nil, arkerrors.Newf(arkerrors.CodeInvalidArgument, "profile %q must not contain path separators", profile)
+			return nil, arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"profile %q must not contain path separators",
+				profile,
+			)
 		}
 		if _, exists := seen[profile]; exists {
 			continue
@@ -288,7 +309,11 @@ func normalizeFormats(formats []Format) ([]Format, error) {
 		switch format {
 		case FormatYAML, FormatYAMLFull, FormatTOML, FormatProperties:
 		default:
-			return nil, arkerrors.Newf(arkerrors.CodeInvalidArgument, "unsupported config format %q", format)
+			return nil, arkerrors.Newf(
+				arkerrors.CodeInvalidArgument,
+				"unsupported config format %q",
+				format,
+			)
 		}
 		if _, exists := seen[format]; exists {
 			continue

@@ -35,7 +35,8 @@ func discoverBaseFiles(options Options) []Candidate {
 			continue
 		}
 		for _, name := range options.baseNames() {
-			if candidate, ok := firstExistingCandidate(name, "", location, options.formatsForBaseName(name)); ok {
+			formats := options.formatsForBaseName(name)
+			if candidate, ok := firstExistingCandidate(name, "", location, formats); ok {
 				candidates = append(candidates, candidate)
 			}
 		}
@@ -49,13 +50,26 @@ func discoverProfileFiles(options Options, profiles []string) []Candidate {
 	for _, profile := range profiles {
 		for _, location := range locations {
 			if _, explicit := explicitFileFormat(location, options.Formats); explicit {
-				if candidate, ok := firstExistingCandidate(options.BaseName, profile, location, options.Formats); ok {
+				candidate, ok := firstExistingCandidate(
+					options.BaseName,
+					profile,
+					location,
+					options.Formats,
+				)
+				if ok {
 					candidates = append(candidates, candidate)
 				}
 				continue
 			}
 			for _, baseName := range options.profileBaseNames() {
-				if candidate, ok := firstExistingCandidate(baseName+"-"+profile, profile, location, options.formatsForBaseName(baseName)); ok {
+				formats := options.formatsForBaseName(baseName)
+				candidate, ok := firstExistingCandidate(
+					baseName+"-"+profile,
+					profile,
+					location,
+					formats,
+				)
+				if ok {
 					candidates = append(candidates, candidate)
 				}
 			}
@@ -64,7 +78,12 @@ func discoverProfileFiles(options Options, profiles []string) []Candidate {
 	return candidates
 }
 
-func firstExistingCandidate(name string, profile string, location string, formats []Format) (Candidate, bool) {
+func firstExistingCandidate(
+	name string,
+	profile string,
+	location string,
+	formats []Format,
+) (Candidate, bool) {
 	if format, ok := explicitFileFormat(location, formats); ok {
 		path := location
 		if profile != "" {

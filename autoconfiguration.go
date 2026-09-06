@@ -30,7 +30,11 @@ type autoConfiguration struct {
 type AutoConfigurationOption func(*autoConfiguration)
 
 // NewAutoConfiguration 创建函数型自动配置。
-func NewAutoConfiguration(name string, fn AutoConfigureFunc, options ...AutoConfigurationOption) AutoConfiguration {
+func NewAutoConfiguration(
+	name string,
+	fn AutoConfigureFunc,
+	options ...AutoConfigurationOption,
+) AutoConfiguration {
 	cfg := &autoConfiguration{name: strings.TrimSpace(name), fn: fn}
 	for _, option := range options {
 		if option != nil {
@@ -65,7 +69,12 @@ func (c *autoConfiguration) Configure(ctx context.Context, app *goark.Applicatio
 	return c.fn(ctx, app)
 }
 
-func configureApplication(ctx context.Context, app *goark.ApplicationContext, autoConfigurations []AutoConfiguration, configurations []goark.Configuration) error {
+func configureApplication(
+	ctx context.Context,
+	app *goark.ApplicationContext,
+	autoConfigurations []AutoConfiguration,
+	configurations []goark.Configuration,
+) error {
 	for _, cfg := range sortedAutoConfigurations(autoConfigurations) {
 		if util.IsNil(cfg) {
 			continue
@@ -74,7 +83,12 @@ func configureApplication(ctx context.Context, app *goark.ApplicationContext, au
 			return arkerrors.Wrap(arkerrors.CodeLifecycle, err, "auto configuration canceled")
 		}
 		if err := cfg.Configure(ctx, app); err != nil {
-			return arkerrors.Wrapf(arkerrors.CodeCreation, err, "auto configuration %q failed", cfg.Name())
+			return arkerrors.Wrapf(
+				arkerrors.CodeCreation,
+				err,
+				"auto configuration %q failed",
+				cfg.Name(),
+			)
 		}
 	}
 	for _, configuration := range configurations {

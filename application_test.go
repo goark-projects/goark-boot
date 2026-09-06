@@ -14,14 +14,22 @@ func TestRunAppliesAutoConfigurationsInOrder(t *testing.T) {
 	calls := make([]string, 0, 2)
 	app, err := boot.Run(t.Context(),
 		boot.WithAutoConfiguration(
-			boot.NewAutoConfiguration("second", func(context.Context, *goark.ApplicationContext) error {
-				calls = append(calls, "second")
-				return nil
-			}, boot.WithAutoConfigurationOrder(20)),
-			boot.NewAutoConfiguration("first", func(context.Context, *goark.ApplicationContext) error {
-				calls = append(calls, "first")
-				return nil
-			}, boot.WithAutoConfigurationOrder(10)),
+			boot.NewAutoConfiguration(
+				"second",
+				func(context.Context, *goark.ApplicationContext) error {
+					calls = append(calls, "second")
+					return nil
+				},
+				boot.WithAutoConfigurationOrder(20),
+			),
+			boot.NewAutoConfiguration(
+				"first",
+				func(context.Context, *goark.ApplicationContext) error {
+					calls = append(calls, "first")
+					return nil
+				},
+				boot.WithAutoConfigurationOrder(10),
+			),
 		),
 	)
 	if err != nil {

@@ -83,7 +83,12 @@ func (a *Application) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := configureApplication(ctx, appContext, a.autoConfigurations, a.configurations); err != nil {
+	if err := configureApplication(
+		ctx,
+		appContext,
+		a.autoConfigurations,
+		a.configurations,
+	); err != nil {
 		return err
 	}
 	if err := appContext.Start(ctx); err != nil {

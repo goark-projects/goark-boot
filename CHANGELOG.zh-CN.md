@@ -23,6 +23,7 @@
 
 - 将配置键统一到 `goark.*` 命名空间。
 - 配置解析与应用启动保持独立包边界。
+- 将所有实际使用的 `golang.org/x` 模块对齐到最新稳定版本。
 
 [未发布]: https://github.com/goark-projects/goark-boot/compare/v0.0.1...HEAD
 [0.0.1]: https://github.com/goark-projects/goark-boot/releases/tag/v0.0.1

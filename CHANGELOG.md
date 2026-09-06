@@ -23,6 +23,7 @@ No unreleased changes.
 
 - Standardized configuration keys under `goark.*` namespaces.
 - Kept configuration parsing and application startup in separate packages.
+- Aligned all used `golang.org/x` modules with their latest stable releases.
 
 [Unreleased]: https://github.com/goark-projects/goark-boot/compare/v0.0.1...HEAD
 [0.0.1]: https://github.com/goark-projects/goark-boot/releases/tag/v0.0.1

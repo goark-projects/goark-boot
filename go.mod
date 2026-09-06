@@ -1,6 +1,6 @@
 module goark.dev/boot
 
-go 1.25
+go 1.26.0
 
 require (
 	github.com/go-viper/encoding/javaproperties v0.1.0

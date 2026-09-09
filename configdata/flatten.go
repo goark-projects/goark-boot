@@ -26,8 +26,13 @@ func flattenValue(out map[string]string, prefix string, value any) {
 		}
 	case []any:
 		parts := make([]string, 0, len(typed))
-		for _, item := range typed {
+		for index, item := range typed {
 			parts = append(parts, scalarString(item))
+			// 对象列表额外保留索引属性，原有标量列表与聚合文本行为不变。
+			switch item.(type) {
+			case map[string]any, []any:
+				flattenValue(out, prefix+"["+strconv.Itoa(index)+"]", item)
+			}
 		}
 		out[prefix] = strings.Join(parts, ",")
 	default:
